@@ -8,7 +8,7 @@ require 'autoload.php';
  * 2 - ошибка авторизации
  * 11 - получение всех пользователей с бд
  */
-$worker = new \Workerman\Worker('websocket://172.16.0.114:8001');
+$worker = new \Workerman\Worker('websocket://127.0.0.1:8001');
 $pdo = (new \app\models\SQLiteConnection())->connect();
 $worker->count = 1;
 
@@ -44,19 +44,76 @@ $worker->onMessage = function ($connection, $date) use( $pdo, $worker) {
     $request = json_decode($date, true);
 
     if($request['status'] == 1) {
-        $pdo = (new \app\models\SQLiteConnection())->connect();
+//        $pdo = (new \app\models\SQLiteConnection())->connect();
         $username = $pdo->query('select * from users u where u.username = ' . '\'' . $request['name'] . '\'' . 'limit 1' )->fetch();
         if($username === false) {
-            $responce['code'] = 2;
+            $response['code'] = 2;
         }
         else {
-            $responce['code'] = 1;
-            $responce['name'] = $username['username'];
+            $response['code'] = 1;
+            $response['name'] = $username['username'];
         }
 
 
-        $responce = json_encode($responce);
-        $connection->send($responce);
+        $response = json_encode($response);
+        $connection->send($response);
+    }
+
+    if($request['status'] == 200) {
+        $messages = $pdo->query('select mg.message, u.username, mg.createdate
+                                            from messages_global mg
+                                            join users u on u.id = mg.userid
+                                          order by mg.createdate')->fetchAll();
+
+        $response['code'] = 200;
+        foreach ($messages as $message) {
+            $response['messages'][] = [$message['message'], $message['username'], $message['createdate'] ];
+        }
+        $response = json_encode($response);
+        $connection->send($response);
+
+    }
+
+    if($request['status'] == 500) {
+//        echo $request['name'];
+        $username = $pdo->query('select * from users u where u.username = ' . '\'' . $request['name'] . '\'' . 'limit 1' )->fetch();
+//        var_dump($username);
+
+        $sql = 'insert into messages_global(userid, createdate, message)
+                values(' . $username['id'] . ',  strftime("%Y-%m-%d %H:%M", "now", "localtime"), \''.$request['message'].'\')';
+
+        echo $sql;
+        $pdo->prepare($sql)->execute();
+
+        $messages = $pdo->query('select mg.message, u.username, mg.createdate
+                                            from messages_global mg
+                                            join users u on u.id = mg.userid
+                                          order by mg.createdate')->fetchAll();
+
+        $response['code'] = 500;
+        foreach ($messages as $message) {
+            $response['messages'][] = [$message['message'], $message['username'], $message['createdate'] ];
+        }
+        $response = json_encode($response);
+        foreach($worker->connections as $clientConnection) {
+            $clientConnection->send($response);
+        }
+
+
+//        echo $request['message'];
+
+//        $messages = $pdo->query('select mg.message, u.username, mg.createdate
+//                                            from messages_global mg
+//                                            join users u on u.id = mg.userid
+//                                          order by mg.createdate')->fetchAll();
+//
+//        $response['code'] = 200;
+//        foreach ($messages as $message) {
+//            $response['messages'][] = [$message['message'], $message['username'], $message['createdate'] ];
+//        }
+//        $response = json_encode($response);
+//        $connection->send($response);
+
     }
 
 //    echo($request['name']);

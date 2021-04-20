@@ -8,42 +8,35 @@ require 'autoload.php';
  * 2 - ошибка авторизации
  * 11 - получение всех пользователей с бд
  */
-$worker = new \Workerman\Worker('websocket://127.0.0.1:8001');
+$worker = new \Workerman\Worker('websocket://172.16.0.114:8001');
 $pdo = (new \app\models\SQLiteConnection())->connect();
 $worker->count = 1;
 
 $worker->onWorkerStart = function($worker) use($pdo)
 {
-    /**
-     * здесь, каждые n секунд, делаем запрос в базу на пользователей и перерисовываем меню контактов.
-     * Код - 11
-     */
-    \Workerman\Lib\Timer::add(3, function() use($pdo, $worker) {
-        $users = $pdo->query('select * from users')->fetchAll();
-        $response['code'] = 11;
-        foreach ($users as $user) {
-            $response['names'][] = $user['username'];
-        }
 
-        $response = json_encode($response);
-        foreach($worker->connections as $clientConnection) {
-            $clientConnection->send($response);
-        }
-    });
 };
 
-$worker->onClose = function ($connection) use($worker) {
+$worker->onClose = function ($connection) use($worker, $pdo) {
     echo 'Connection closed' . PHP_EOL;
 };
 
 $worker->onConnect = function ($connection) use($pdo, $worker) {
     $connection->send('Пользователь присоединился');
 
-
-
     /**
-     * каждые три секунды отправляем инфу об актуальных пользователях
+     * здесь, делаем запрос в базу на пользователей и перерисовываем меню контактов.
+     * Код - 11
      */
+    $users = $pdo->query('select * from users')->fetchAll();
+    $response['code'] = 11;
+    foreach ($users as $user) {
+        $response['names'][] = $user['username'];
+    }
+
+    $response = json_encode($response);
+
+    $connection->send($response);
 
 };
 

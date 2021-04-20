@@ -8,7 +8,7 @@ require 'autoload.php';
  * 2 - ошибка авторизации
  * 11 - получение всех пользователей с бд
  */
-$worker = new \Workerman\Worker('websocket://172.16.0.114:8001');
+$worker = new \Workerman\Worker('websocket://127.0.0.1:8001');
 $pdo = (new \app\models\SQLiteConnection())->connect();
 $worker->count = 1;
 
